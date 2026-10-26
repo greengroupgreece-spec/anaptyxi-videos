@@ -5,6 +5,7 @@ import time
 import datetime
 import urllib.request
 import urllib.parse
+import urllib.error
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -13,135 +14,227 @@ FORUM_IDS = [18, 14, 17, 16, 31, 21, 2, 13, 11, 6, 9, 26, 24, 23, 10]
 
 DATA_FILE = Path("videos.json")
 ARCHIVE_FILE = Path("video_archive.json")
+STATE_FILE = Path("video_scan_state.json")
+
 DAILY_COUNT = 15
+FORUM_PAGES_PER_RUN = 3
+TOPICS_PER_RUN = 25
+REQUEST_DELAY = 0.4
+TIMEOUT = 10
+
 
 class PageParser(HTMLParser):
     def __init__(self):
-        super().__init__()
+        super().__init__(convert_charrefs=True)
         self.links = []
-        self.embeds = []
         self.current = None
+        self.depth = 0
 
     def handle_starttag(self, tag, attrs):
-        a = dict(attrs)
-        if tag == "a" and a.get("href"):
-            self.current = [a["href"], ""]
-        if tag == "iframe" and a.get("src"):
-            self.embeds.append(a["src"])
+        attrs = dict(attrs)
+        if tag == "a" and attrs.get("href"):
+            if self.current is None:
+                self.current = [attrs["href"], ""]
+                self.depth = 1
+            else:
+                self.depth += 1
 
     def handle_data(self, data):
-        if self.current:
+        if self.current is not None:
             self.current[1] += data
 
     def handle_endtag(self, tag):
-        if tag == "a" and self.current:
-            self.links.append(tuple(self.current))
-            self.current = None
+        if tag == "a" and self.current is not None:
+            self.depth -= 1
+            if self.depth <= 0:
+                self.links.append(tuple(self.current))
+                self.current = None
+                self.depth = 0
+
 
 def fetch(url):
-    req = urllib.request.Request(
+    request = urllib.request.Request(
         url,
-        headers={"User-Agent": "Mozilla/5.0"}
+        headers={
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "text/html"
+        }
     )
-    with urllib.request.urlopen(req, timeout=20) as response:
+    with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
         return response.read().decode("utf-8", errors="replace")
 
-def parse(html):
-    p = PageParser()
-    p.feed(html)
-    return p
+
+def load_json(path, default):
+    if path.exists():
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            pass
+    return default
+
+
+def save_json(path, data):
+    path.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding="utf-8"
+    )
+
 
 def youtube_id(html):
     patterns = [
         r'youtube(?:-nocookie)?\.com/embed/([\w-]{11})',
         r'youtube\.com/watch\?[^"\s<>]*?v=([\w-]{11})',
         r'youtu\.be/([\w-]{11})',
-        r'youtube\.com/shorts/([\w-]{11})'
+        r'youtube\.com/shorts/([\w-]{11})',
+        r'youtube\.com/v/([\w-]{11})'
     ]
     for pattern in patterns:
-        match = re.search(pattern, html)
+        match = re.search(pattern, html, re.IGNORECASE)
         if match:
             return match.group(1)
     return None
 
-def load_archive():
-    if ARCHIVE_FILE.exists():
-        try:
-            data = json.loads(ARCHIVE_FILE.read_text(encoding="utf-8"))
-            return data if isinstance(data, list) else []
-        except (ValueError, OSError):
-            pass
-    return []
 
-def discover():
-    found = []
+def extract_topics(html):
+    parser = PageParser()
+    parser.feed(html)
+
+    topics = []
     seen = set()
 
-    for fid in FORUM_IDS:
-        # A limited scan each day keeps requests manageable.
-        for offset in [0, 50]:
-            url = f"{BASE}/f{fid}p{offset}-forum"
-            try:
-                page = parse(fetch(url))
-            except Exception as exc:
-                print("Forum error:", url, exc)
-                continue
+    for href, title in parser.links:
+        url = urllib.parse.urljoin(BASE, href)
+        parsed = urllib.parse.urlparse(url)
 
-            for href, title in page.links:
-                full = urllib.parse.urljoin(BASE, href)
-                match = re.search(r'/t(\d+)', full)
-                if not match:
-                    continue
-                tid = match.group(1)
-                if tid in seen:
-                    continue
-                seen.add(tid)
-                title = " ".join(title.split())
-                if title:
-                    found.append({
-                        "id": tid,
-                        "title": title,
-                        "url": f"{BASE}/t{tid}"
-                    })
+        if parsed.netloc != "anaptyxi.forumotion.eu":
+            continue
 
-            time.sleep(0.3)
+        match = re.match(r"/t(\d+)(?:[-/]|$)", parsed.path)
+        if not match:
+            continue
 
-    return found
+        tid = match.group(1)
+        title = " ".join(title.split())
+
+        if not title or tid in seen:
+            continue
+
+        seen.add(tid)
+        topics.append({
+            "id": tid,
+            "title": title,
+            "url": urllib.parse.urlunparse(
+                (parsed.scheme, parsed.netloc, parsed.path,
+                 "", "", "")
+            )
+        })
+
+    return topics
+
 
 def main():
-    archive = load_archive()
-    known = {str(item["id"]) for item in archive}
-    candidates = discover()
+    archive = load_json(ARCHIVE_FILE, [])
+    state = load_json(STATE_FILE, {})
 
-    # Inspect a limited number of new topics each run.
-    checked = 0
-    for topic in candidates:
-        if topic["id"] in known:
+    if not isinstance(archive, list):
+        archive = []
+    if not isinstance(state, dict):
+        state = {}
+
+    checked = set(map(str, state.get("checked", [])))
+    pending = state.get("pending", [])
+    page_index = int(state.get("page_index", 0))
+
+    if not isinstance(pending, list):
+        pending = []
+
+    known = {
+        str(item["id"])
+        for item in archive
+        if isinstance(item, dict) and "id" in item
+    }
+
+    # Build a rotating list of forum pages.
+    pages = []
+    for offset in [0, 50, 100, 150, 200]:
+        for fid in FORUM_IDS:
+            pages.append(f"{BASE}/f{fid}p{offset}-forum")
+
+    # Discover a few pages per execution.
+    for _ in range(FORUM_PAGES_PER_RUN):
+        url = pages[page_index % len(pages)]
+
+        try:
+            html = fetch(url)
+            topics = extract_topics(html)
+
+            existing = {
+                str(item["id"])
+                for item in pending
+                if isinstance(item, dict) and "id" in item
+            }
+
+            for topic in topics:
+                tid = topic["id"]
+                if tid not in checked and tid not in known and tid not in existing:
+                    pending.append(topic)
+                    existing.add(tid)
+
+            print("Scanned:", url, "topics:", len(topics), flush=True)
+
+        except Exception as exc:
+            print("Forum error:", url, exc, flush=True)
+
+        page_index += 1
+        time.sleep(REQUEST_DELAY)
+
+    # Inspect a limited number of topics.
+    inspected = 0
+    retry = []
+
+    while pending and inspected < TOPICS_PER_RUN:
+        topic = pending.pop(0)
+        tid = str(topic["id"])
+
+        if tid in checked or tid in known:
             continue
-        if checked >= 30:
-            break
-        checked += 1
+
+        inspected += 1
 
         try:
             html = fetch(topic["url"])
             vid = youtube_id(html)
+
             if vid:
-                topic["img"] = f"https://img.youtube.com/vi/{vid}/hqdefault.jpg"
+                topic["img"] = (
+                    f"https://img.youtube.com/vi/{vid}/hqdefault.jpg"
+                )
                 archive.append(topic)
-                known.add(topic["id"])
+                known.add(tid)
+                print("Found video:", topic["title"], flush=True)
+
+            checked.add(tid)
+
         except Exception as exc:
-            print("Topic error:", topic["url"], exc)
+            print("Topic error:", topic["url"], exc, flush=True)
+            retry.append(topic)
 
-        time.sleep(0.3)
+        time.sleep(REQUEST_DELAY)
 
-    # Preserve discovered videos, ordered by topic ID.
-    archive.sort(key=lambda x: int(x["id"]))
-    ARCHIVE_FILE.write_text(
-        json.dumps(archive, ensure_ascii=False, indent=2),
-        encoding="utf-8"
-    )
+    pending.extend(retry)
 
-    # Rotate through all archived videos in groups of 15.
+    # Preserve every discovered video.
+    archive.sort(key=lambda item: int(item["id"]))
+    save_json(ARCHIVE_FILE, archive)
+
+    # Save progress for the next daily run.
+    save_json(STATE_FILE, {
+        "checked": sorted(checked, key=int),
+        "pending": pending,
+        "page_index": page_index
+    })
+
+    # Rotate through the archive, 15 videos per day.
     today = datetime.datetime.now(datetime.timezone.utc).date()
     day_number = (today - datetime.date(2026, 10, 27)).days
 
@@ -154,12 +247,15 @@ def main():
     else:
         selected = []
 
-    DATA_FILE.write_text(
-        json.dumps({"videos": selected}, ensure_ascii=False, indent=2),
-        encoding="utf-8"
+    save_json(DATA_FILE, {"videos": selected})
+
+    print(
+        f"Archived: {len(archive)}; "
+        f"Displayed: {len(selected)}; "
+        f"Pending: {len(pending)}",
+        flush=True
     )
 
-    print(f"Archived: {len(archive)}; displayed: {len(selected)}")
 
 if __name__ == "__main__":
     main()
