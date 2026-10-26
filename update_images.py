@@ -21,6 +21,13 @@ TOPICS_PER_RUN = 30
 REQUEST_DELAY = 0.4
 TIMEOUT = 15
 
+BAD_IMAGE_NAMES = (
+    "reddot", "dot", "avatar", "icon", "smil",
+    "sprite", "rank", "button", "folder",
+    "sticky", "announce", "newpm", "empty",
+    "blank", "pixel", "logo", "spacer"
+)
+
 
 def fetch(url):
     request = urllib.request.Request(
@@ -70,58 +77,84 @@ class LinkParser(HTMLParser):
 
 class ImageParser(HTMLParser):
     def __init__(self):
-        super().__init__()
+        super().__init__(convert_charrefs=True)
         self.images = []
-        self.in_post = False
         self.post_depth = 0
+        self.anchor_stack = []
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
         classes = attrs.get("class", "").split()
 
         if tag == "div":
-            if self.in_post:
+            if self.post_depth:
                 self.post_depth += 1
             elif "postbody" in classes:
-                self.in_post = True
                 self.post_depth = 1
 
-        if tag == "img" and self.in_post:
+        if tag == "a":
+            self.anchor_stack.append(attrs.get("href", ""))
+
+        if tag == "img" and self.post_depth:
             src = (
-                attrs.get("src")
+                attrs.get("data-original")
                 or attrs.get("data-src")
-                or attrs.get("data-original")
+                or attrs.get("src")
+                or ""
             )
-            if src:
-                self.images.append((src, classes))
+
+            href = (
+                self.anchor_stack[-1]
+                if self.anchor_stack else ""
+            )
+
+            self.images.append({
+                "src": src,
+                "classes": classes,
+                "href": href
+            })
 
     def handle_endtag(self, tag):
-        if tag == "div" and self.in_post:
+        if tag == "a" and self.anchor_stack:
+            self.anchor_stack.pop()
+
+        if tag == "div" and self.post_depth:
             self.post_depth -= 1
-            if self.post_depth <= 0:
-                self.in_post = False
 
 
 def is_bad(src):
-    src = src.lower()
-    blocked = [
-        "avatar", "icon", "smiles", "sprite",
-        "rank", "button", "folder", "sticky",
-        "announce", "newpm", "empty", "blank",
-        "pixel", "2img.net", "illiweb"
-    ]
-    return any(word in src for word in blocked)
+    if not src:
+        return True
+
+    path = urllib.parse.urlparse(src.lower()).path
+    filename = path.rsplit("/", 1)[-1]
+
+    if any(word in filename for word in BAD_IMAGE_NAMES):
+        return True
+
+    if "2img.net" in src.lower():
+        return True
+
+    if "illiweb" in src.lower():
+        return True
+
+    return False
 
 
 def get_image(html):
     parser = ImageParser()
     parser.feed(html)
 
-    for src, classes in parser.images:
-        if not any(
-            name in classes
-            for name in ("realPostImage", "resize_img")
-        ) and "servimg.com" not in src:
+    for image in parser.images:
+        src = image["src"]
+        classes = image["classes"]
+        href = image["href"]
+
+        if not (
+            "realPostImage" in classes
+            or "resize_img" in classes
+            or "servimg.com/view" in href
+        ):
             continue
 
         full = urllib.parse.urljoin(BASE, src)
@@ -142,10 +175,7 @@ def discover_offsets(fid):
     html = fetch(forum_url(fid, 0))
     offsets = {0}
 
-    for match in re.finditer(
-        rf'/f{fid}p(\d+)',
-        html
-    ):
+    for match in re.finditer(rf'/f{fid}p(\d+)', html):
         offsets.add(int(match.group(1)))
 
     return sorted(offsets, reverse=True)
@@ -185,6 +215,12 @@ def main():
     archive = load_json(ARCHIVE_FILE, [])
     state = load_json(STATE_FILE, {})
 
+    # Remove previously collected decorative images.
+    archive = [
+        item for item in archive
+        if not is_bad(item.get("img", ""))
+    ]
+
     known = {str(item["id"]) for item in archive}
     checked = set(str(x) for x in state.get("checked", []))
     forums = state.setdefault("forums", {})
@@ -206,6 +242,7 @@ def main():
             continue
 
         last = progress.get("last_offset")
+
         if last is not None:
             offsets = [x for x in offsets if x < last]
 
