@@ -1,24 +1,6 @@
 {
   "videos": [
     {
-      "id": "451",
-      "title": "Επισκόπηση: Αββακούμ",
-      "url": "https://anaptyxi.forumotion.eu/t451-%CE%95%CF%80%CE%B9%CF%83%CE%BA%CF%8C%CF%80%CE%B7%CF%83%CE%B7-%CE%91%CE%B2%CE%B2%CE%B1%CE%BA%CE%BF%CF%8D%CE%BC",
-      "img": "https://img.youtube.com/vi/Ih8UnDYPBM0/hqdefault.jpg"
-    },
-    {
-      "id": "455",
-      "title": "Ο Θεός είναι εδώ (God's here - 2025)",
-      "url": "https://anaptyxi.forumotion.eu/t455-%CE%9F-%CE%98%CE%B5%CF%8C%CF%82-%CE%B5%CE%AF%CE%BD%CE%B1%CE%B9-%CE%B5%CE%B4%CF%8E-god-s-here-2025",
-      "img": "https://img.youtube.com/vi/KQMEa0OkLb0/hqdefault.jpg"
-    },
-    {
-      "id": "462",
-      "title": "Οι επιστολές του Παύλου",
-      "url": "https://anaptyxi.forumotion.eu/t462-%CE%9F%CE%B9-%CE%B5%CF%80%CE%B9%CF%83%CF%84%CE%BF%CE%BB%CE%AD%CF%82-%CF%84%CE%BF%CF%85-%CE%A0%CE%B1%CF%8D%CE%BB%CE%BF%CF%85",
-      "img": "https://img.youtube.com/vi/qIRNUkVQr8s/hqdefault.jpg"
-    },
-    {
       "id": "477",
       "title": "Τα Δύο Θαύματα του Ιησού",
       "url": "https://anaptyxi.forumotion.eu/t477-%CE%A4%CE%B1-%CE%94%CF%8D%CE%BF-%CE%98%CE%B1%CF%8D%CE%BC%CE%B1%CF%84%CE%B1-%CF%84%CE%BF%CF%85-%CE%99%CE%B7%CF%83%CE%BF%CF%8D",
@@ -73,6 +55,12 @@
       "img": "https://img.youtube.com/vi/d7mQUf6c8z8/hqdefault.jpg"
     },
     {
+      "id": "510",
+      "title": "Παιδικό Τραγούδι - Το κοκοράκι ('Οταν θα πάω κυρά μου στο παζάρι) - LemonitaTV",
+      "url": "https://anaptyxi.forumotion.eu/t510-%CE%A0%CE%B1%CE%B9%CE%B4%CE%B9%CE%BA%CF%8C-%CE%A4%CF%81%CE%B1%CE%B3%CE%BF%CF%8D%CE%B4%CE%B9-%CE%A4%CE%BF-%CE%BA%CE%BF%CE%BA%CE%BF%CF%81%CE%AC%CE%BA%CE%B9-%CE%9F%CF%84%CE%B1%CE%BD-%CE%B8%CE%B1-%CF%80%CE%AC%CF%89-%CE%BA%CF%85%CF%81%CE%AC-%CE%BC%CE%BF%CF%85-%CF%83%CF%84%CE%BF-%CF%80%CE%B1%CE%B6%CE%AC%CF%81%CE%B9-lemonitatv",
+      "img": "https://img.youtube.com/vi/RT-NGsnQ-9A/hqdefault.jpg"
+    },
+    {
       "id": "513",
       "title": "Μια υπόθεση υπέρ της Αγάπης",
       "url": "https://anaptyxi.forumotion.eu/t513-%CE%9C%CE%B9%CE%B1-%CF%85%CF%80%CF%8C%CE%B8%CE%B5%CF%83%CE%B7-%CF%85%CF%80%CE%AD%CF%81-%CF%84%CE%B7%CF%82-%CE%91%CE%B3%CE%AC%CF%80%CE%B7%CF%82",
@@ -89,6 +77,18 @@
       "title": "Μελετήσαμε το χρίσμα στην Αγία Γραφή (Να τι ανακαλύψαμε)",
       "url": "https://anaptyxi.forumotion.eu/t519-%CE%9C%CE%B5%CE%BB%CE%B5%CF%84%CE%AE%CF%83%CE%B1%CE%BC%CE%B5-%CF%84%CE%BF-%CF%87%CF%81%CE%AF%CF%83%CE%BC%CE%B1-%CF%83%CF%84%CE%B7%CE%BD-%CE%91%CE%B3%CE%AF%CE%B1-%CE%93%CF%81%CE%B1%CF%86%CE%AE-%CE%9D%CE%B1-%CF%84%CE%B9-%CE%B1%CE%BD%CE%B1%CE%BA%CE%B1%CE%BB%CF%8D%CF%88%CE%B1%CE%BC%CE%B5",
       "img": "https://img.youtube.com/vi/-uPNMO-YA5E/hqdefault.jpg"
+    },
+    {
+      "id": "520",
+      "title": "Επισκόπηση: Αγγαίος",
+      "url": "https://anaptyxi.forumotion.eu/t520-%CE%95%CF%80%CE%B9%CF%83%CE%BA%CF%8C%CF%80%CE%B7%CF%83%CE%B7-%CE%91%CE%B3%CE%B3%CE%B1%CE%AF%CE%BF%CF%82",
+      "img": "https://img.youtube.com/vi/RbpNbI4i2uA/hqdefault.jpg"
+    },
+    {
+      "id": "523",
+      "title": "Παιδικό Τραγούδι - Ο Μπαρμπαμπρίλιος - LemonitaTV",
+      "url": "https://anaptyxi.forumotion.eu/t523-%CE%A0%CE%B1%CE%B9%CE%B4%CE%B9%CE%BA%CF%8C-%CE%A4%CF%81%CE%B1%CE%B3%CE%BF%CF%8D%CE%B4%CE%B9-%CE%9F-%CE%9C%CF%80%CE%B1%CF%81%CE%BC%CF%80%CE%B1%CE%BC%CF%80%CF%81%CE%AF%CE%BB%CE%B9%CE%BF%CF%82-lemonitatv",
+      "img": "https://img.youtube.com/vi/umyVhHAp24w/hqdefault.jpg"
     }
   ]
 }
